@@ -740,7 +740,7 @@ $timer.Add_Tick({
 })
 
 # --- Arranque ----------------------------------------------------------------
-if ($firstRun -and $IsExe) { Set-Startup $true }
+if ($firstRun) { Set-Startup $true }
 Load-UI
 Clear-OldLogs
 Write-Log 'Programa iniciado'
