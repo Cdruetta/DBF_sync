@@ -32,8 +32,13 @@ if (-not $createdNew) {
 # --- Configuracion -----------------------------------------------------------
 $script:Cfg = [ordered]@{
     BatPath          = ''
+    Mode             = 'Intervalo'   # 'Intervalo' o 'Horarios'
     IntervalValue    = 15
     IntervalUnit     = 'Minutos'
+    Schedule1        = '08:00'
+    Schedule2        = '14:00'
+    Enable1          = $true
+    Enable2          = $true
     LogFolder        = (Join-Path $ConfigDir 'logs')
     LogRetentionDays = 30
     TimeoutMinutes   = 30
@@ -72,6 +77,34 @@ function Convert-ToSeconds($value, $unit) {
 }
 
 function Get-IntervalSeconds { return (Convert-ToSeconds $script:Cfg.IntervalValue $script:Cfg.IntervalUnit) }
+
+function Parse-TimeOfDay($s) {
+    $t = $null
+    if ([DateTime]::TryParseExact([string]$s, 'HH:mm', [System.Globalization.CultureInfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::None, [ref]$t)) {
+        return $t.TimeOfDay
+    }
+    $t2 = $null
+    if ([DateTime]::TryParse([string]$s, [ref]$t2)) { return $t2.TimeOfDay }
+    return $null
+}
+
+function Get-NextScheduled {
+    $now = Get-Date
+    $cands = @()
+    $slots = @(
+        @{ En = $script:Cfg.Enable1; T = $script:Cfg.Schedule1 }
+        @{ En = $script:Cfg.Enable2; T = $script:Cfg.Schedule2 }
+    )
+    foreach ($sl in $slots) {
+        if (-not $sl.En) { continue }
+        $tod = Parse-TimeOfDay $sl.T
+        if ($null -eq $tod) { continue }
+        $today = $now.Date.Add($tod)
+        if ($today -ge $now) { $cands += $today } else { $cands += $today.AddDays(1) }
+    }
+    if ($cands.Count -eq 0) { return $null }
+    return ($cands | Sort-Object | Select-Object -First 1)
+}
 
 # --- Estado ------------------------------------------------------------------
 $script:Running    = $false   # ciclo automatico activo
@@ -156,7 +189,7 @@ function New-Ctl($type, $x, $y, $w, $h, $text = '') {
 
 $form = New-Object System.Windows.Forms.Form
 $form.Text = 'dbf_sync - Ejecutor de copia.bat'
-$form.ClientSize = New-Object System.Drawing.Size(540, 600)
+$form.ClientSize = New-Object System.Drawing.Size(540, 640)
 $form.StartPosition = 'CenterScreen'
 $form.FormBorderStyle = 'FixedSingle'
 $form.MaximizeBox = $false
@@ -213,17 +246,34 @@ $chkAuto   = New-Ctl System.Windows.Forms.CheckBox 12 166 490 20 'Iniciar el cic
 $chkRunNow = New-Ctl System.Windows.Forms.CheckBox 12 188 490 20 'Ejecutar inmediatamente al iniciar el ciclo'
 $chkWin    = New-Ctl System.Windows.Forms.CheckBox 12 210 490 20 'Iniciar con Windows (solo para este usuario)'
 
-$grpCfg.Controls.AddRange(@($l1, $txtBat, $btnBat, $l2, $numInt, $cboUnit, $l3, $numTimeout, $l4, $txtLogDir, $btnLogDir, $l5, $numRet, $btnOpenLogs, $chkAuto, $chkRunNow, $chkWin))
-$grpCfg.Height = 238
+# Modo de ejecucion
+$lMode = New-Ctl System.Windows.Forms.Label 12 236 92 20 'Modo:'
+$cboMode = New-Ctl System.Windows.Forms.ComboBox 108 233 120 23
+$cboMode.DropDownStyle = 'DropDownList'
+[void]$cboMode.Items.AddRange(@('Intervalo', 'Horarios'))
+$btnModeHelp = New-Ctl System.Windows.Forms.Button 232 232 24 24 '?'
+$btnModeHelp.FlatStyle = 'Flat'
+
+# Horarios puntuales (modo Horarios)
+$lTime1 = New-Ctl System.Windows.Forms.Label 12 266 92 20 'Hora mañana:'
+$txtTime1 = New-Ctl System.Windows.Forms.TextBox 108 263 70 23
+$chkTime1 = New-Ctl System.Windows.Forms.CheckBox 190 263 120 23 'Activo'
+
+$lTime2 = New-Ctl System.Windows.Forms.Label 12 296 92 20 'Hora tarde:'
+$txtTime2 = New-Ctl System.Windows.Forms.TextBox 108 293 70 23
+$chkTime2 = New-Ctl System.Windows.Forms.CheckBox 190 293 120 23 'Activo'
+
+$grpCfg.Controls.AddRange(@($l1, $txtBat, $btnBat, $l2, $numInt, $cboUnit, $l3, $numTimeout, $l4, $txtLogDir, $btnLogDir, $l5, $numRet, $btnOpenLogs, $chkAuto, $chkRunNow, $chkWin, $lMode, $cboMode, $btnModeHelp, $lTime1, $txtTime1, $chkTime1, $lTime2, $txtTime2, $chkTime2))
+$grpCfg.Height = 326
 
 # Botones
-$btnSave  = New-Ctl System.Windows.Forms.Button 10 388 120 32 'Guardar'
-$btnStart = New-Ctl System.Windows.Forms.Button 140 388 120 32 'Iniciar'
-$btnStop  = New-Ctl System.Windows.Forms.Button 270 388 120 32 'Detener'
-$btnNow   = New-Ctl System.Windows.Forms.Button 400 388 130 32 'Ejecutar ahora'
+$btnSave  = New-Ctl System.Windows.Forms.Button 10 476 120 32 'Guardar'
+$btnStart = New-Ctl System.Windows.Forms.Button 140 476 120 32 'Iniciar'
+$btnStop  = New-Ctl System.Windows.Forms.Button 270 476 120 32 'Detener'
+$btnNow   = New-Ctl System.Windows.Forms.Button 400 476 130 32 'Ejecutar ahora'
 
 # Log en pantalla
-$txtLogView = New-Ctl System.Windows.Forms.TextBox 10 430 520 160
+$txtLogView = New-Ctl System.Windows.Forms.TextBox 10 518 520 110
 $txtLogView.Multiline = $true
 $txtLogView.ReadOnly = $true
 $txtLogView.ScrollBars = 'Vertical'
@@ -281,7 +331,14 @@ function Stop-ProcTree($proc) {
     try { & taskkill.exe /PID $proc.Id /T /F 2>&1 | Out-Null } catch {}
 }
 
-function Set-NextRun { $script:Next = (Get-Date).AddSeconds((Get-IntervalSeconds)) }
+function Set-NextRun {
+    if ($script:Cfg.Mode -eq 'Horarios') {
+        $n = Get-NextScheduled
+        if ($n) { $script:Next = $n } else { $script:Next = (Get-Date).AddDays(1) }
+    } else {
+        $script:Next = (Get-Date).AddSeconds((Get-IntervalSeconds))
+    }
+}
 
 function Start-Run {
     if ($script:Proc) { return }
@@ -404,6 +461,19 @@ function Load-UI {
     $chkAuto.Checked = [bool]$script:Cfg.AutoStart
     $chkRunNow.Checked = [bool]$script:Cfg.RunOnStart
     $chkWin.Checked = Get-Startup
+    $cboMode.SelectedItem = [string]$script:Cfg.Mode
+    if ($cboMode.SelectedIndex -lt 0) { $cboMode.SelectedIndex = 0 }
+    $txtTime1.Text = [string]$script:Cfg.Schedule1
+    $txtTime2.Text = [string]$script:Cfg.Schedule2
+    $chkTime1.Checked = [bool]$script:Cfg.Enable1
+    $chkTime2.Checked = [bool]$script:Cfg.Enable2
+    Update-ModeUI
+}
+
+function Update-ModeUI {
+    $sched = ($cboMode.SelectedItem -eq 'Horarios')
+    foreach ($c in @($numInt, $cboUnit, $l2)) { $c.Enabled = -not $sched; $c.Visible = -not $sched }
+    foreach ($c in @($lTime1, $txtTime1, $chkTime1, $lTime2, $txtTime2, $chkTime2)) { $c.Enabled = $sched; $c.Visible = $sched }
 }
 
 function Save-FromUI {
@@ -412,10 +482,28 @@ function Save-FromUI {
         [System.Windows.Forms.MessageBox]::Show('El archivo .bat indicado no existe.', $AppName, 'OK', 'Warning') | Out-Null
         return $false
     }
-    $secs = Convert-ToSeconds $numInt.Value $cboUnit.SelectedItem
-    if ($secs -lt 10) {
-        [System.Windows.Forms.MessageBox]::Show('El intervalo minimo es de 10 segundos.', $AppName, 'OK', 'Warning') | Out-Null
-        return $false
+    $mode = [string]$cboMode.SelectedItem
+    if ($mode -eq 'Intervalo') {
+        $secs = Convert-ToSeconds $numInt.Value $cboUnit.SelectedItem
+        if ($secs -lt 10) {
+            [System.Windows.Forms.MessageBox]::Show('El intervalo minimo es de 10 segundos.', $AppName, 'OK', 'Warning') | Out-Null
+            return $false
+        }
+    } else {
+        $t1 = $txtTime1.Text.Trim()
+        $t2 = $txtTime2.Text.Trim()
+        if ($chkTime1.Checked -and -not (Parse-TimeOfDay $t1)) {
+            [System.Windows.Forms.MessageBox]::Show('Hora mañana invalida. Use formato HH:mm.', $AppName, 'OK', 'Warning') | Out-Null
+            return $false
+        }
+        if ($chkTime2.Checked -and -not (Parse-TimeOfDay $t2)) {
+            [System.Windows.Forms.MessageBox]::Show('Hora tarde invalida. Use formato HH:mm.', $AppName, 'OK', 'Warning') | Out-Null
+            return $false
+        }
+        if (-not $chkTime1.Checked -and -not $chkTime2.Checked) {
+            [System.Windows.Forms.MessageBox]::Show('Active al menos un horario.', $AppName, 'OK', 'Warning') | Out-Null
+            return $false
+        }
     }
     $logDir = $txtLogDir.Text.Trim().Trim('"')
     if (-not $logDir) {
@@ -428,8 +516,13 @@ function Save-FromUI {
         return $false
     }
     $script:Cfg.BatPath = $bat
+    $script:Cfg.Mode = $mode
     $script:Cfg.IntervalValue = [int]$numInt.Value
     $script:Cfg.IntervalUnit = [string]$cboUnit.SelectedItem
+    $script:Cfg.Schedule1 = $txtTime1.Text.Trim()
+    $script:Cfg.Schedule2 = $txtTime2.Text.Trim()
+    $script:Cfg.Enable1 = [bool]$chkTime1.Checked
+    $script:Cfg.Enable2 = [bool]$chkTime2.Checked
     $script:Cfg.TimeoutMinutes = [int]$numTimeout.Value
     $script:Cfg.LogFolder = $logDir
     $script:Cfg.LogRetentionDays = [int]$numRet.Value
@@ -526,7 +619,7 @@ Ejecuta automáticamente un archivo .bat (por ejemplo copia.bat) cada cierto tie
 
 CÓMO USARLO
 1. En "Archivo .bat" elija el archivo a ejecutar (botón Buscar...).
-2. En "Ejecutar cada" indique cada cuánto debe correr.
+2. Elija el Modo: "Intervalo" (cada cierto tiempo) o "Horarios" (hora puntual de mañana y tarde).
 3. Elija la carpeta donde se guardan los logs.
 4. Presione Guardar y luego Iniciar.
 Al cerrar la ventana (X) el programa sigue funcionando junto al reloj. Para cerrarlo por completo: clic derecho en el ícono y Salir.
@@ -582,6 +675,18 @@ NOTAS
 }
 
 # --- Eventos -----------------------------------------------------------------
+$cboMode.Add_SelectedIndexChanged({ Update-ModeUI })
+
+$btnModeHelp.Add_Click({
+    [System.Windows.Forms.MessageBox]::Show(@"
+Modo de ejecucion:
+
+Intervalo: ejecuta el .bat cada cierto tiempo (segundos/minutos/horas).
+
+Horarios: ejecuta el .bat a horas puntuales del dia (mañana y tarde). Active cada franja con su casilla "Activo" e indique la hora en formato HH:mm (24 horas, ej. 08:30). Si la hora de hoy ya paso, se programa para mañana.
+"@, $AppName, 'OK', 'Information') | Out-Null
+})
+
 $btnBat.Add_Click({
     $dlg = New-Object System.Windows.Forms.OpenFileDialog
     $dlg.Title = 'Seleccione el archivo .bat a ejecutar'
