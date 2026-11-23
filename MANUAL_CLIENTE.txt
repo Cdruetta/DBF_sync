@@ -1,0 +1,155 @@
+=========================================================
+  dbf_sync - Manual para el cliente
+=========================================================
+
+QUE ES dbf_sync
+---------------
+dbf_sync es un programa pequeño que se queda funcionando
+en segundo plano (junto al reloj de Windows) y ejecuta
+automaticamente un archivo .bat (por ejemplo copia.bat)
+a la hora que usted indique. El .bat es el que hace la
+copia; dbf_sync solo lo ejecuta, controla y registra
+el resultado.
+
+No necesita conocimientos técnicos: solo seguir estos
+pasos.
+
+
+1) QUE ARCHIVOS NECESITA
+------------------------
+En una misma carpeta debe tener:
+  - DBF_sync.exe
+  - Instalar_exe.bat
+  - copia.bat   (el script que hace la copia; lo aporta
+                 quien configura el sistema)
+
+No ejecute los archivos desde dentro de un .zip: primero
+descomprima la carpeta.
+
+
+2) INSTALACION
+--------------
+1. Abra la carpeta donde estan los archivos.
+2. Haga doble clic en "Instalar_exe.bat".
+3. Se abre una ventana negra. Espere a que termine.
+   (La primera vez puede tardar unos segundos.)
+4. Al final dice "Listo" y pide presionar una tecla.
+   Presione cualquier tecla.
+5. Se crea un acceso directo "dbf_sync" en el escritorio
+   y el programa se abre solo.
+
+Si Windows pregunta si permite que el programa haga
+cambios, responda "Si".
+
+
+3) PRIMERA CONFIGURACION (solo la primera vez)
+----------------------------------------------
+Se abre la ventana de dbf_sync. Configure asi:
+
+a) Archivo .bat:
+   - Haga clic en "Buscar..." y elija su copia.bat.
+   (Si no lo encuentra, copie copia.bat a la carpeta
+   del programa y vuelva a buscarlo.)
+
+b) Modo (como y cuando se ejecuta):
+   - "Intervalo": ejecuta el .bat cada cierto tiempo
+     (segundos, minutos u horas).
+   - "Horarios": ejecuta el .bat a horas fijas del dia.
+     Active "Activo" en "Hora mañana" y/o "Hora tarde"
+     e indique la hora en formato de 24 horas, por
+     ejemplo 08:30 o 14:00.
+   Si no sabe cual elegir, use "Horarios".
+
+   El boton "?" al lado de "Modo" explica la diferencia.
+
+c) Limite por corrida (min):
+   - Es el tiempo maximo que puede tardar una corrida.
+   Si el .bat tarda mas de ese tiempo, se cancela y
+   se registra como error. Deje 30 si no esta seguro.
+
+d) Carpeta de logs:
+   - Donde se guardan los registros. Deje la que viene
+   por defecto.
+
+e) Conservar logs (dias): cuantos dias se guardan los
+   registros. Deje 30.
+
+f) Casillas de opciones:
+   - "Iniciar el ciclo automaticamente al abrir el
+     programa": recomendado dejar marcado.
+   - "Ejecutar inmediatamente al iniciar el ciclo":
+     si lo marca, la primera corrida es al abrir, sin
+     esperar la hora.
+   - "Iniciar con Windows": recomendado dejar marcado
+     para que arranque solo al encender la PC.
+
+g) Haga clic en "Guardar".
+h) Haga clic en "Iniciar".
+
+Ya esta funcionando.
+
+
+4) USO DIARIO
+--------------
+- El programa se queda funcionando junto al reloj
+  (abajo a la derecha). No cierre la ventana con la X:
+  al cerrarla, el programa sigue en segundo plano.
+  Para volver a abrir la ventana, haga doble clic
+  en el icono junto al reloj.
+
+- El icono cambia de color segun el estado:
+    Verde : activo, esperando la proxima ejecucion.
+    Azul  : ejecutandose en este momento.
+    Rojo  : la ultima ejecucion fallo (revise el log).
+    Gris  : detenido.
+
+- "Ejecutar ahora": corre el .bat una vez sin esperar
+  la hora. Util para probar.
+
+- Para salir por completo: clic derecho en el icono
+  junto al reloj y "Salir".
+
+
+5) DONDE SE GUARDAN LAS COSAS
+-----------------------------
+- Configuracion : %APPDATA%\dbf_sync\config.json
+- Logs          : %APPDATA%\dbf_sync\logs
+  (puede abrir la carpeta con el boton "Abrir carpeta")
+- Programa      : %LOCALAPPDATA%\dbf_sync
+
+
+6) DESINSTALAR
+--------------
+1. Haga doble clic en "Desinstalar.bat".
+2. Se cierra el programa y se quitan los archivos.
+3. Al final pregunta si tambien borra la configuracion
+   y los logs. Responda S (si) o N (no).
+
+Si eligio otra carpeta para los logs, borrela a mano.
+
+
+7) PROBLEMAS COMUNES
+--------------------
+- "No se encuentra el archivo .bat":
+  Revise la ruta en "Archivo .bat" y que el archivo
+  exista. Vuelva a seleccionarlo con "Buscar...".
+
+- "La unidad especificada no es valida" en el log:
+  Falta montar una unidad de red (Z:, F:, G:). Abra
+  la sesion de Windows y monte la unidad; dbf_sync
+  corre con su usuario y necesita esas unidades.
+
+- El icono esta en rojo:
+  La ultima corrida fallo. Abra la carpeta de logs y
+  revise el archivo del dia.
+
+- No arranca con Windows:
+  Marque "Iniciar con Windows", haga clic en "Guardar"
+  y reinicie la PC.
+
+- El programa no abre porque "ya esta corriendo":
+  Ya hay una instancia abierta. Busque el icono junto
+  al reloj y haga doble clic para abrir la ventana.
+
+Ante cualquier duda, contacte a quien le entrego el
+programa.
