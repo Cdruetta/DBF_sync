@@ -29,6 +29,11 @@ descomprima la carpeta.
 
 2) INSTALACION
 --------------
+IMPORTANTE: si ya tiene una version anterior de dbf_sync
+instalada o corriendo, desinstalela primero (ejecute
+Desinstalar.bat de la version anterior y responda S para
+borrar configuracion y logs). Luego instale esta.
+
 1. Abra la carpeta donde estan los archivos.
 2. Haga doble clic en "Instalar_exe.bat".
 3. Se abre una ventana negra. Espere a que termine.
